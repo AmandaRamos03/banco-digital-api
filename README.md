@@ -52,7 +52,7 @@ O PostgreSQL sobe na porta **15432**, para não conflitar com um PostgreSQL que 
 ./mvnw spring-boot:run
 ```
 
-No Windows (PowerShell ou CMD), use `mvnw.cmd spring-boot:run`.
+No Windows, no PowerShell, use `.\mvnw.cmd spring-boot:run` (no CMD, sem o `.\`).
 
 A API fica em `http://localhost:8080`.
 
