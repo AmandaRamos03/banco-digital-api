@@ -1,7 +1,9 @@
 package com.amanda.bancodigital.exception;
 
 import org.junit.jupiter.api.Test;
+import org.springframework.http.HttpMethod;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -30,6 +32,16 @@ class GlobalExceptionHandlerTest {
         ResponseEntity<ErroResponse> resposta = handler.tratarRegraNegocio(new RecursoNaoEncontradoException("Conta não encontrada"));
 
         assertThat(resposta.getStatusCode().value()).isEqualTo(404);
+    }
+
+    @Test
+    void rotaInexistente_retorna404() {
+        var ex = new NoResourceFoundException(HttpMethod.GET, "/naoexiste", "naoexiste");
+
+        ResponseEntity<ErroResponse> resposta = handler.tratarRotaInexistente(ex);
+
+        assertThat(resposta.getStatusCode().value()).isEqualTo(404);
+        assertThat(resposta.getBody().mensagem()).isEqualTo("Rota não encontrada");
     }
 
     @Test
