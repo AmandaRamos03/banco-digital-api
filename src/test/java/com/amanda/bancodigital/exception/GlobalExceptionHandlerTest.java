@@ -3,6 +3,9 @@ package com.amanda.bancodigital.exception;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.HttpMediaTypeNotSupportedException;
+import org.springframework.web.HttpRequestMethodNotSupportedException;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -42,6 +45,34 @@ class GlobalExceptionHandlerTest {
 
         assertThat(resposta.getStatusCode().value()).isEqualTo(404);
         assertThat(resposta.getBody().mensagem()).isEqualTo("Rota não encontrada");
+    }
+
+    @Test
+    void metodoNaoPermitido_retorna405() {
+        ResponseEntity<ErroResponse> resposta = handler.tratarMetodoNaoPermitido(new HttpRequestMethodNotSupportedException("GET"));
+
+        assertThat(resposta.getStatusCode().value()).isEqualTo(405);
+        assertThat(resposta.getBody().mensagem()).isEqualTo("Método não permitido");
+    }
+
+    @Test
+    void contentTypeNaoSuportado_retorna415() {
+        var ex = new HttpMediaTypeNotSupportedException("Content-Type 'text/plain' is not supported");
+
+        ResponseEntity<ErroResponse> resposta = handler.tratarContentTypeInvalido(ex);
+
+        assertThat(resposta.getStatusCode().value()).isEqualTo(415);
+        assertThat(resposta.getBody().mensagem()).isEqualTo("Content-Type deve ser application/json");
+    }
+
+    @Test
+    void parametroComTipoErrado_retorna400ComNomeDoParametro() {
+        var ex = new MethodArgumentTypeMismatchException("abc", Integer.class, "page", null, null);
+
+        ResponseEntity<ErroResponse> resposta = handler.tratarParametroInvalido(ex);
+
+        assertThat(resposta.getStatusCode().value()).isEqualTo(400);
+        assertThat(resposta.getBody().mensagem()).isEqualTo("Parâmetro inválido: page");
     }
 
     @Test
