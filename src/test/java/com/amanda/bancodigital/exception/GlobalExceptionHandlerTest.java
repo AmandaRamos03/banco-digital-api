@@ -1,0 +1,42 @@
+package com.amanda.bancodigital.exception;
+
+import org.junit.jupiter.api.Test;
+import org.springframework.http.ResponseEntity;
+
+import static org.assertj.core.api.Assertions.assertThat;
+
+class GlobalExceptionHandlerTest {
+
+    private final GlobalExceptionHandler handler = new GlobalExceptionHandler();
+
+    @Test
+    void saldoInsuficiente_retorna422ComMensagem() {
+        ResponseEntity<ErroResponse> resposta = handler.tratarRegraNegocio(new SaldoInsuficienteException());
+
+        assertThat(resposta.getStatusCode().value()).isEqualTo(422);
+        assertThat(resposta.getBody().mensagem()).isEqualTo("Saldo insuficiente");
+    }
+
+    @Test
+    void recursoDuplicado_retorna409() {
+        ResponseEntity<ErroResponse> resposta = handler.tratarRegraNegocio(new RecursoDuplicadoException("CPF já cadastrado"));
+
+        assertThat(resposta.getStatusCode().value()).isEqualTo(409);
+        assertThat(resposta.getBody().mensagem()).isEqualTo("CPF já cadastrado");
+    }
+
+    @Test
+    void recursoNaoEncontrado_retorna404() {
+        ResponseEntity<ErroResponse> resposta = handler.tratarRegraNegocio(new RecursoNaoEncontradoException("Conta não encontrada"));
+
+        assertThat(resposta.getStatusCode().value()).isEqualTo(404);
+    }
+
+    @Test
+    void erroInesperado_retorna500SemDetalhesInternos() {
+        ResponseEntity<ErroResponse> resposta = handler.tratarErroInesperado(new IllegalStateException("detalhe interno"));
+
+        assertThat(resposta.getStatusCode().value()).isEqualTo(500);
+        assertThat(resposta.getBody().mensagem()).isEqualTo("Erro interno");
+    }
+}
