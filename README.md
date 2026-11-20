@@ -1,6 +1,6 @@
 # Banco Digital API
 
-![CI](https://github.com/SEU-USUARIO/banco-digital-api/actions/workflows/ci.yml/badge.svg)
+![CI](https://github.com/AmandaRamos03/banco-digital-api/actions/workflows/ci.yml/badge.svg)
 
 API REST de um banco digital, feita em Java com Spring Boot. Nela dá para abrir uma conta, fazer login, depositar, sacar, consultar o extrato e transferir dinheiro entre contas no estilo Pix, usando CPF ou e-mail como chave.
 
