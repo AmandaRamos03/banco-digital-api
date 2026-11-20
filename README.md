@@ -2,25 +2,30 @@
 
 ![CI](https://github.com/SEU-USUARIO/banco-digital-api/actions/workflows/ci.yml/badge.svg)
 
-API REST de um banco digital simples, feita com Java e Spring Boot. Dá para criar conta, fazer login, depositar, sacar, ver o extrato e transferir dinheiro entre contas no estilo Pix, usando CPF ou e-mail como chave.
+API REST de um banco digital, feita em Java com Spring Boot. Nela dá para abrir uma conta, fazer login, depositar, sacar, consultar o extrato e transferir dinheiro entre contas no estilo Pix, usando CPF ou e-mail como chave.
 
-Fiz esse projeto para praticar o que mais aparece nas vagas de desenvolvedora Java: API REST, banco de dados relacional, autenticação com JWT, testes e Docker.
+## Por que um banco?
 
-## Funcionalidades
+O Pix faz parte do meu dia a dia, e eu sempre tive curiosidade sobre o que acontece por trás de uma transferência: como o sistema garante que o dinheiro sai de uma conta e chega na outra sem se perder no meio do caminho, ou que ninguém consegue gastar mais do que tem.
 
-- Cadastro de cliente (a conta é aberta automaticamente, com saldo zero)
+Escolhi construir um banco porque é um domínio em que os detalhes importam. Um centavo arredondado errado ou uma transferência pela metade são problemas reais. Isso me obrigou a pensar com cuidado em regras de negócio, transações, segurança e testes, em vez de fazer só um CRUD.
+
+## O que a API faz
+
+- Cadastro de cliente, com abertura automática da conta
 - Login com token JWT
 - Consulta de saldo
 - Depósito e saque
 - Transferência Pix por CPF ou e-mail
-- Extrato paginado, das movimentações mais recentes para as mais antigas
+- Extrato paginado, do mais recente para o mais antigo
 
-Regras de negócio:
+### Regras que eu quis garantir
 
 - O saldo nunca fica negativo
-- Não é possível fazer Pix para a própria conta
+- Não dá para fazer Pix para a própria conta
 - Valores precisam ser maiores que zero e ter no máximo 2 casas decimais
-- A transferência acontece numa única transação: se algo der errado, nada é debitado
+- A transferência é atômica: ou debita e credita, ou não faz nada
+- O CPF é validado pelos dígitos verificadores (CPFs como `000.000.000-00` são recusados)
 - O CPF pode ser digitado com ou sem pontuação, e o e-mail não diferencia maiúsculas de minúsculas
 
 ## Tecnologias
@@ -34,9 +39,26 @@ Regras de negócio:
 - Docker Compose
 - GitHub Actions
 
+## Decisões que tomei, e por quê
+
+- **`BigDecimal` para dinheiro.** Com `double`, `0.1 + 0.2` dá `0.30000000000000004`. Em um banco, isso não pode acontecer.
+- **`@Transactional` na transferência.** Se qualquer passo do Pix falhar, o banco desfaz tudo. Não existe débito sem crédito.
+- **As regras moram perto dos dados.** É a própria `Conta` que impede o saldo de ficar negativo no método `debitar`, então não tem como esquecer essa verificação em algum lugar do código.
+- **Senha com BCrypt.** A senha nunca é salva em texto puro, nem consegue ser recuperada a partir do banco.
+- **JWT e API stateless.** O servidor não guarda sessão: cada requisição traz o próprio token, que vale 2 horas.
+- **DTOs com `record`.** A API nunca devolve a entidade direto. Assim, por exemplo, a senha do cliente não tem como vazar numa resposta.
+- **Erros padronizados.** Um `@RestControllerAdvice` transforma cada tipo de erro no código HTTP certo (400, 401, 404, 409, 422), sempre com uma mensagem em português e no mesmo formato.
+
+## O que eu aprendi
+
+- A diferença entre validar o **formato** de um dado (`@Positive`, `@Email` no DTO, que gera 400) e validar uma **regra de negócio** (saldo insuficiente, Pix para si mesma, que gera 422).
+- Como funciona o fluxo de autenticação com JWT de ponta a ponta: login, geração do token, e o filtro que valida o token a cada requisição.
+- Escrever o teste antes do código. Na validação do CPF, primeiro escrevi os casos (CPF válido, dígito errado, todos os dígitos iguais) e vi os testes falharem, depois implementei o cálculo até tudo passar.
+- Resolver problema de ambiente: o PostgreSQL do Docker não conectava porque eu já tinha outro PostgreSQL instalado usando a porta 5432. Por isso o banco do projeto usa a porta `15432`.
+
 ## Como rodar
 
-Pré-requisitos: Java 21 e Docker.
+Pré-requisitos: **Java 21** e **Docker**.
 
 1. Suba o banco de dados:
 
@@ -44,25 +66,24 @@ Pré-requisitos: Java 21 e Docker.
 docker compose up -d
 ```
 
-O PostgreSQL sobe na porta **15432**, para não conflitar com um PostgreSQL que já esteja instalado na máquina.
-
 2. Rode a aplicação:
 
 ```bash
 ./mvnw spring-boot:run
 ```
 
-No Windows, no PowerShell, use `.\mvnw.cmd spring-boot:run` (no CMD, sem o `.\`).
+No Windows, pelo PowerShell, use `.\mvnw.cmd spring-boot:run`.
 
-A API fica em `http://localhost:8080`.
+Quando a aplicação terminar de subir, o console mostra os links da API e do Swagger.
 
-## Documentação (Swagger)
+## Testando pelo Swagger
 
-Com a aplicação rodando, acesse:
+Com a aplicação rodando, acesse **http://localhost:8080/swagger-ui.html**
 
-**http://localhost:8080/swagger-ui.html**
-
-Para testar as rotas protegidas: faça o cadastro, depois o login, copie o `token` da resposta, clique em **Authorize** e cole o token.
+1. Crie uma conta em `POST /auth/cadastro`
+2. Faça login em `POST /auth/login` e copie o `token`
+3. Clique em **Authorize** e cole o token
+4. Agora as rotas de conta e Pix estão liberadas
 
 ## Endpoints
 
@@ -76,33 +97,27 @@ Para testar as rotas protegidas: faça o cadastro, depois o login, copie o `toke
 | POST | `/pix/transferencias` | sim | Transfere para uma chave Pix (CPF ou e-mail) |
 | GET | `/contas/extrato?page=0&size=20` | sim | Extrato paginado |
 
-## Exemplo de uso
+### Exemplo com curl
 
 ```bash
 # cadastro
 curl -X POST http://localhost:8080/auth/cadastro \
   -H "Content-Type: application/json" \
-  -d '{"nome":"Ana Souza","cpf":"123.456.789-09","email":"ana@email.com","senha":"senha123"}'
+  -d '{"nome":"Ana Souza","cpf":"529.982.247-25","email":"ana@email.com","senha":"senha123"}'
 
 # login
 curl -X POST http://localhost:8080/auth/login \
   -H "Content-Type: application/json" \
   -d '{"email":"ana@email.com","senha":"senha123"}'
 
-# deposito (troque TOKEN pelo token do login)
+# depósito (troque TOKEN pelo token do login)
 curl -X POST http://localhost:8080/contas/deposito \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer TOKEN" \
   -d '{"valor":150.00}'
-
-# pix
-curl -X POST http://localhost:8080/pix/transferencias \
-  -H "Content-Type: application/json" \
-  -H "Authorization: Bearer TOKEN" \
-  -d '{"chave":"bruno@email.com","valor":50.00}'
 ```
 
-Exemplo de erro:
+Quando algo dá errado, a resposta sempre segue o mesmo formato:
 
 ```json
 {
@@ -118,13 +133,13 @@ Exemplo de erro:
 ./mvnw test
 ```
 
-Os testes cobrem as regras de negócio dos services (cadastro, depósito, saque e Pix), a geração e validação do token JWT e o tratamento de erros. Eles não precisam de banco de dados nem de Docker, e rodam automaticamente no GitHub Actions a cada push.
+São 45 testes unitários cobrindo as regras de negócio (cadastro, depósito, saque e Pix), a validação de CPF, a geração e validação do token JWT e o tratamento de erros. Eles usam Mockito no lugar do banco, então rodam em segundos e sem Docker. O GitHub Actions roda todos eles a cada push.
 
 ## Estrutura
 
 ```
 src/main/java/com/amanda/bancodigital
-├── config        segurança e Swagger
+├── config        segurança, Swagger e mensagem de inicialização
 ├── controller    endpoints
 ├── dto           objetos de entrada e saída
 ├── entity        Cliente, Conta e Transacao
@@ -132,20 +147,12 @@ src/main/java/com/amanda/bancodigital
 ├── repository    acesso ao banco
 ├── security      JWT
 ├── service       regras de negócio
-└── util          normalização de CPF/e-mail e validação de valores
+└── util          validação de CPF, e-mail e valores
 ```
 
-## Algumas decisões
+## O que eu ainda quero melhorar
 
-- **BigDecimal para dinheiro**, porque `double` tem problemas de precisão em contas com centavos.
-- **Senha com BCrypt**, nunca salva em texto puro.
-- **Autenticação stateless com JWT**: a API não guarda sessão, e o token vale por 2 horas.
-- **DTOs com records**, para não expor as entidades diretamente na API.
-- **Tratamento global de erros** com `@RestControllerAdvice`, para todas as respostas de erro terem o mesmo formato.
-
-## Próximos passos
-
-- Testes de integração com Testcontainers
-- Controle de concorrência em transferências simultâneas
-- Migrations com Flyway
-- Deploy em nuvem
+- **Concorrência:** hoje, duas transferências saindo da mesma conta exatamente ao mesmo tempo poderiam ler o mesmo saldo. Quero resolver isso com lock no banco.
+- **Testes de integração** com Testcontainers, rodando contra um PostgreSQL de verdade.
+- **Migrations com Flyway**, em vez de deixar o Hibernate criar as tabelas.
+- **Deploy**, para dar para testar a API sem precisar rodar localmente.
