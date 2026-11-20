@@ -80,6 +80,8 @@ Quando a aplicação terminar de subir, o console mostra os links da API e do Sw
 
 Com a aplicação rodando, acesse **http://localhost:8080/swagger-ui.html**
 
+![Swagger da Banco Digital API](docs/swagger.png)
+
 1. Crie uma conta em `POST /auth/cadastro`
 2. Faça login em `POST /auth/login` e copie o `token`
 3. Clique em **Authorize** e cole o token
